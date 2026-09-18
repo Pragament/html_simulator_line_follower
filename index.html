@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Line Follower Lab — Block Coding + Maths/Physics</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:#070c16;color:#e6edf7;overflow:hidden;
+  }
+  header{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:10px 16px;background:#0c1526;border-bottom:1px solid #1e2b44;
+  }
+  header h1{font-size:16px;margin:0;letter-spacing:.4px;white-space:nowrap}
+  header h1 span{color:#ffd93d}
+  .ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  select,button,input[type=number]{
+    font-family:inherit;font-size:12px;border-radius:7px;border:1px solid #27374f;
+    background:#152238;color:#e6edf7;padding:6px 9px;outline:none;
+  }
+  button{cursor:pointer;transition:.15s}
+  button:hover{background:#1d2f4d;border-color:#3d5party}
+  button:hover{background:#1d2f4d}
+  button.primary{background:#1f6feb;border-color:#1f6feb;color:#fff;font-weight:600}
+  button.primary:hover{background:#2b7dff}
+  button.danger{background:#a1263c;border-color:#a1263c;color:#fff}
+  button.danger:hover{background:#c02f49}
+
+  #app{display:flex;height:calc(100vh - 53px)}
+
+  /* ---------- LEFT ---------- */
+  #left{width:355px;min-width:355px;display:flex;flex-direction:column;border-right:1px solid #1e2b44;background:#0a1220}
+  .ptitle{
+    font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:#6d84a8;
+    padding:8px 12px 4px;font-weight:700;
+  }
+  #palette{padding:0 8px 8px;overflow-y:auto;max-height:44%;border-bottom:1px solid #1e2b44}
+  #script{flex:1;overflow-y:auto;padding:10px 8px 60px}
+
+  .cat-label{font-size:10px;color:#5d7397;letter-spacing:1px;margin:8px 4px 4px;text-transform:uppercase}
+
+  .pblock{
+    display:flex;align-items:center;gap:6px;
+    padding:7px 10px;margin:5px 0;border-radius:9px;
+    font-size:12.5px;font-weight:600;color:#fff;cursor:grab;
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 2px 0 rgba(0,0,0,.35);
+    user-select:none;
+  }
+  .pblock:active{cursor:grabbing}
+  .pblock.motion{background:linear-gradient(180deg,#4c97ff,#3d7fd6)}
+  .pblock.control{background:linear-gradient(180deg,#ffab19,#e0900c)}
+  .pblock.sensing{background:linear-gradient(180deg,#5cb1d6,#3f8fb3)}
+
+  /* ---------- BLOCKS ---------- */
+  .block{
+    border-radius:9px;margin:6px 0;padding:6px 8px 6px 10px;
+    font-size:12.5px;font-weight:600;color:#fff;
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 2px 0 rgba(0,0,0,.35);
+  }
+  .block.motion{background:#3d7fd6}
+  .block.control{background:#d9920f}
+  .block.hat{background:#2f9e6b}
+  .block-head{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .block-label{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+  .block input[type=number]{
+    width:48px;padding:2px 4px;font-size:12px;border-radius:5px;
+    background:#fff;color:#111;border:none;text-align:center;font-weight:700;
+  }
+  .block select{
+    padding:2px 4px;font-size:11.5px;border-radius:5px;background:#fff;color:#111;
+    border:none;font-weight:700;max-width:190px;
+  }
+  .block .del{
+    margin-left:auto;background:transparent;border:none;color:rgba(255,255,255,.75);
+    font-size:15px;line-height:1;padding:0 4px;cursor:pointer;
+  }
+  .block .del:hover{color:#fff;background:rgba(0,0,0,.2);border-radius:4px}
+
+  .body{
+    margin:6px 0 2px 14px;padding:6px 6px 6px 12px;
+    border-left:3px solid rgba(255,255,255,.28);
+    border-radius:0 0 0 8px;min-height:20px;
+    background:rgba(0,0,0,.13);
+  }
+  .body.over{background:rgba(255,255,255,.18);outline:1.5px dashed #fff}
+  .body .hint{font-size:11px;color:rgba(255,255,255,.5);font-weight:500;font-style:italic}
+
+  /* ---------- MAIN ---------- */
+  main{flex:1;display:flex;flex-direction:column;overflow-y:auto;padding:12px;gap:10px;align-items:center}
+  #stage{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;justify-content:center}
+  canvas{background:#0b1220;border-radius:12px;border:1px solid #1e2b44;display:block;max-width:100%}
+
+  #hud{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+    background:#0c1526;border:1px solid #1e2b44;border-radius:12px;padding:12px;min-width:230px;
+  }
+  .stat{font-size:11px;color:#6d84a8;text-transform:uppercase;letter-spacing:.8px}
+  .stat b{display:block;font-size:17px;color:#e6edf7;letter-spacing:0;text-transform:none;margin-top:2px}
+  .stat b.good{color:#3ddc84}
+  .stat b.warn{color:#ffb020}
+  .stat b.bad{color:#ff5a5a}
+
+  #banner{
+    width:100%;max-width:900px;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:600;
+    background:#132140;border:1px solid #24354f;color:#9fb6d8;
+  }
+  #banner.ok{background:#0f2e1f;border-color:#1f6b42;color:#6ff0a8}
+  #banner.err{background:#2e0f18;border-color:#6b1f2f;color:#ff8fa3}
+
+  #info{width:100%;max-width:900px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .card{background:#0c1526;border:1px solid #1e2b44;border-radius:12px;padding:12px}
+  .card h3{margin:0 0 6px;font-size:12px;letter-spacing:1px;color:#6d84a8;text-transform:uppercase}
+  .card p{margin:0 0 6px;font-size:12.5px;line-height:1.5;color:#b8c9e2}
+  .clue{background:#101d33;border-left:3px solid #ffd93d;padding:8px 10px;border-radius:0 8px 8px 0;margin:6px 0;font-size:12.5px;line-height:1.5}
+  .clue b{color:#ffd93d}
+  .clue .rule{color:#7fe0ff;font-size:12px;display:block;margin-top:3px}
+  .clue.done{border-left-color:#3ddc84;opacity:.65}
+  .clue .ans{color:#3ddc84;font-weight:700}
+  #clueList{max-height:230px;overflow-y:auto}
+  @media(max-width:1100px){
+    #app{flex-direction:column;height:auto}
+    #left{width:100%;min-width:0;height:60vh;border-right:none;border-bottom:1px solid #1e2b44}
+    #info{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 Line Follower <span>Lab</span></h1>
+  <div class="ctrl">
+    <select id="mazeType"></select>
+    <button id="newMaze">🎲 New Maze</button>
+  </div>
+  <div class="ctrl" style="margin-left:auto">
+    <button id="runBtn" class="primary">▶ Run</button>
+    <button id="stopBtn" class="danger">⏹ Stop</button>
+    <button id="resetBtn">↺ Reset</button>
+  </div>
+</header>
+
+<div id="app">
+  <aside id="left">
+    <div class="ptitle">Blocks</div>
+    <div id="palette"></div>
+    <div class="ptitle">Script</div>
+    <div id="script"></div>
+  </aside>
+
+  <main>
+    <div id="stage">
+      <canvas id="cv"></canvas>
+      <div id="hud">
+        <div class="stat">Time<b id="sTime">0.0 s</b></div>
+        <div class="stat">Distance<b id="sDist">0 cm</b></div>
+        <div class="stat">Checkpoints<b id="sCp">0 / 1</b></div>
+        <div class="stat">Speed<b id="sSpeed">0 %</b></div>
+        <div class="stat">Speed limit<b id="sLimit">70 %</b></div>
+        <div class="stat">Violations<b id="sViol">0</b></div>
+      </div>
+    </div>
+    <div id="banner">Drag blocks into the script area, then press ▶ Run.</div>
+    <div id="info">
+      <div class="card">
+        <h3 id="mtName">Maze type</h3>
+        <p id="mtDesc"></p>
+        <p style="color:#7fe0ff"><b>Example:</b> <span id="mtEx"></span></p>
+      </div>
+      <div class="card">
+        <h3>Checkpoint clues</h3>
+        <div id="clueList"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ==========================================================================
+   LINE FOLLOWER LAB
+   Maths/Physics Knowledge -> Decision -> Robot Behaviour -> Measurable Result
+   ========================================================================== */
+
+/* ---------------- constants ---------------- */
+const CELL = 52, COLS = 13, ROWS = 9;
+const W = COLS * CELL, H = ROWS * CELL;
+const DIRS = [
+  {dx:0,  dy:-1, ang:-Math.PI/2}, // 0 N
+  {dx:1,  dy:0,  ang:0},          // 1 E
+  {dx:0,  dy:1,  ang:Math.PI/2},  // 2 S
+  {dx:-1, dy:0,  ang:Math.PI}     // 3 W
+];
+const PX_PER_PCT = 2.4;           // speed % -> px/s
+const TURN_RATE  = Math.PI * 2.2; // rad/s
+
+/* ---------------- maze types ---------------- */
+const MAZE_TYPES = {
+  waypoint: {
+    name: '1 · Waypoint Run  (1 checkpoint)',
+    cps: 1,
+    desc: 'ONE checkpoint. Its meaning is "mandatory waypoint": the robot must pass through it before the goal. At the checkpoint the route bends — the clue tells you whether to turn LEFT or RIGHT. Getting the maths wrong means taking the wrong branch (a dead-end decoy).',
+    ex: 'A courier van must stop at the fuel depot before reaching the warehouse. The depot sign says: "3/4 of 80 — even → right, odd → left."'
+  },
+  relay: {
+    name: '2 · Arithmetic Relay  (2 checkpoints)',
+    cps: 2,
+    desc: 'TWO checkpoints. Their meaning is a relay: each checkpoint hands you one number and the second one modifies it. The final combined value decides the direction at BOTH bends. Two decisions, two chances to get it wrong.',
+    ex: 'Depot A gives "25 % of 240". Depot B gives "half of that". Combine them, then apply the rule printed at each gate.'
+  },
+  pattern: {
+    name: '3 · Pattern Trail  (3 checkpoints)',
+    cps: 3,
+    desc: 'THREE checkpoints. Their meaning is a sequence: the checkpoints reveal terms of a number pattern. Recognising the rule (arithmetic, geometric, squares, Fibonacci-like) tells you which branch continues the trail.',
+    ex: 'The trail reads 2, 5, 10, 17, … The next term is 26 — that is the number you must use at the third gate.'
+  },
+  geometry: {
+    name: '4 · Geometry Grid  (4 checkpoints)',
+    cps: 4,
+    desc: 'FOUR checkpoints. Their meaning is a set of points on a coordinate grid. You compute angles, distances and coordinates; the resulting measures decide each turn. Four linked decisions — pure geometry navigation.',
+    ex: 'Checkpoint A sits at (2,3) and B at (2,11). The distance is 8 → 8 is even, so the robot turns right at gate B.'
+  }
+};
+
+/* ---------------- maths problem bank ---------------- */
+const PROBLEMS = [
+  {q:'3/4 of 80',                                   a:60, topic:'Fractions'},
+  {q:'2/5 of 45',                                   a:18, topic:'Fractions'},
+  {q:'5/8 of 64',                                   a:40, topic:'Fractions'},
+  {q:'25% of 240',                                  a:60, topic:'Percentages'},
+  {q:'40% of 90',                                   a:36, topic:'Percentages'},
+  {q:'15% of 200',                                  a:30, topic:'Percentages'},
+  {q:'84 divided in the ratio 3:4 — larger part',   a:48, topic:'Ratio'},
+  {q:'60 divided in the ratio 1:2 — larger part',   a:40, topic:'Ratio'},
+  {q:'a 2.4 m rope cut into 8 equal pieces — each piece in cm', a:30, topic:'Measurement'},
+  {q:'two angles of a triangle are 65° and 45° — third angle',  a:70, topic:'Angles'},
+  {q:'a triangle has three equal angles — each angle',          a:60, topic:'Angles'},
+  {q:'a rectangle 12 cm × 5 cm — perimeter',                    a:34, topic:'Geometry'},
+  {q:'distance between (2,3) and (2,11)',                       a:8,  topic:'Coordinates'},
+  {q:'a car travels 150 m in 5 s — speed in m/s',               a:30, topic:'Speed'},
+  {q:'a robot at 4 m/s covers 100 m — time in seconds',         a:25, topic:'Time'},
+  {q:'F = m·a with m = 4 kg, a = 3 m/s² — force in N',          a:12, topic:'Force'},
+  {q:'friction = μ·N with μ = 0.4, N = 50 N — force in N',      a:20, topic:'Friction'},
+  {q:'the next term of 2, 5, 10, 17, …',                        a:26, topic:'Patterns'},
+  {q:'the next term of 3, 6, 12, 24, …',                        a:48, topic:'Patterns'},
+  {q:'the square number that comes after 49',                   a:64, topic:'Patterns'},
+  {q:'7 × 8 − 12',                                              a:44, topic:'Arithmetic'},
+  {q:'144 ÷ 6 + 3',                                             a:27, topic:'Arithmetic'},
+  {q:'the next even number after 39',                           a:40, topic:'Arithmetic'},
+  {q:'half of 90, plus 5',                                      a:50, topic:'Arithmetic'}
+];
+
+const RULES = [
+  {text:'EVEN answer → turn RIGHT · ODD answer → turn LEFT',
+   fn:a => a % 2 === 0 ? 'right' : 'left'},
+  {text:'answer > 50 → turn LEFT · otherwise turn RIGHT',
+   fn:a => a > 50 ? 'left' : 'right'},
+  {text:'multiple of 5 → turn LEFT · otherwise turn RIGHT',
+   fn:a => a % 5 === 0 ? 'left' : 'right'},
+  {text:'answer ≥ 40 → turn RIGHT · otherwise turn LEFT',
+   fn:a => a >= 40 ? 'right' : 'left'},
+  {text:'answer < 30 → turn LEFT · otherwise turn RIGHT',
+   fn:a => a < 30 ? 'left' : 'right'},
+  {text:'multiple of 10 → go STRAIGHT · otherwise turn LEFT',
+   fn:a => a % 10 === 0 ? 'straight' : 'left'},
+  {text:'perfect square → go STRAIGHT · otherwise turn RIGHT',
+   fn:a => Number.isInteger(Math.sqrt(a)) ? 'straight' : 'right'}
+];
+
+/* ---------------- helpers ---------------- */
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const rint  = (a,b)=>Math.floor(a+Math.random()*(b-a+1));
+const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=rint(0,i);[a[i],a[j]]=[a[j],a[i]];} return a; };
+function angDiff(a,b){ let d=a-b; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; return d; }
+function angLerp(a,b,t){ return a + angDiff(b,a)*t; }
+function cellCenter(c){ return {x:(c.x+0.5)*CELL, y:(c.y+0.5)*CELL}; }
+function dirBetween(a,b){
+  if(b.x-a.x===1) return 1;
+  if(b.x-a.x===-1) return 3;
+  if(b.y-a.y===1) return 2;
+  return 0;
+}
+
+/* ==========================================================================
+   MAZE GENERATION
+   ========================================================================== */
+function genMaze(cols,rows){
+  const cells=[];
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++)
+    cells.push({x,y,walls:[true,true,true,true],visited:false});
+  const at=(x,y)=>cells[y*cols+x];
+  const stack=[cells[0]];
+  cells[0].visited=true;
+  while(stack.length){
+    const c=stack[stack.length-1];
+    const nbrs=[];
+    for(let d=0;d<4;d++){
+      const nx=c.x+DIRS[d].dx, ny=c.y+DIRS[d].dy;
+      if(nx>=0&&nx<cols&&ny>=0&&ny<rows&&!at(nx,ny).visited) nbrs.push(d);
+    }
+    if(!nbrs.length){ stack.pop(); continue; }
+    const d=nbrs[rint(0,nbrs.length-1)];
+    const nx=c.x+DIRS[d].dx, ny=c.y+DIRS[d].dy;
+    c.walls[d]=false;
+    at(nx,ny).walls[(d+2)%4]=false;
+    at(nx,ny).visited=true;
+    stack.push(at(nx,ny));
+  }
+  return cells;
+}
+
+function solve(cells,cols,rows,start,goal){
+  const at=(x,y)=>cells[y*cols+x];
+  const prev=new Array(cols*rows).fill(-1);
+  const seen=new Set([start.y*cols+start.x]);
+  const q=[start];
+  while(q.length){
+    const c=q.shift();
+    if(c.x===goal.x&&c.y===goal.y) break;
+    for(let d=0;d<4;d++){
+      if(c.walls[d]) continue;
+      const nx=c.x+DIRS[d].dx, ny=c.y+DIRS[d].dy;
+      if(nx<0||ny<0||nx>=cols||ny>=rows) continue;
+      const k=ny*cols+nx;
+      if(seen.has(k)) continue;
+      seen.add(k);
+      prev[k]=c.y*cols+c.x;
+      q.push(at(nx,ny));
+    }
+  }
+  const path=[];
+  let cur=goal.y*cols+goal.x;
+  const sk=start.y*cols+start.x;
+  let guard=0;
+  while(cur!==-1 && guard++<5000){
+    path.push(cells[cur]);
+    if(cur===sk) break;
+    cur=prev[cur];
+  }
+  return path.reverse();
+}
+
+/* ==========================================================================
+   STATE
+   ========================================================================== */
+const state = {
+  cells:[], cols:COLS, rows:ROWS,
+  path:[], checkpoints:[], decoy:new Map(),
+  speedLimit: 70,
+  typeKey:'waypoint',
+  mode:'idle',
+  elapsed:0, distance:0, visited:[], nextCP:0, atCP:null,
+  overSpeed:0, message:'', success:false, finished:false,
+  robot:{ x:0,y:0,heading:0,speed:0,targetSpeed:120,targetSpeedPct:50,
+          s:0, route:null, turnDir:1, turnRemaining:0 }
+};
+
+/* ==========================================================================
+   MAZE BUILD
+   ========================================================================== */
+function buildMaze(typeKey){
+  state.typeKey = typeKey;
+  const cfg = MAZE_TYPES[typeKey];
+  const cols=COLS, rows=ROWS;
+  let cells, path, tries=0;
+  do{
+    cells = genMaze(cols,rows);
+    path  = solve(cells,cols,rows,cells[0],cells[cols*rows-1]);
+    tries++;
+  } while(path.length < 22 && tries < 40);
+
+  state.cells = cells;
+  state.path  = path;
+  state.decoy = new Map();
+
+  /* --- find cells where the path turns --- */
+  const turns=[];
+  for(let i=1;i<path.length-1;i++){
+    const d1=dirBetween(path[i-1],path[i]);
+    const d2=dirBetween(path[i],path[i+1]);
+    if(d1!==d2) turns.push(i);
+  }
+
+  /* --- pick checkpoint positions --- */
+  const n = cfg.cps;
+  const idxs=[];
+  if(turns.length >= n){
+    for(let k=0;k<n;k++){
+      const j = Math.floor((k+0.5)/n * turns.length);
+      idxs.push(turns[clamp(j,0,turns.length-1)]);
+    }
+  } else {
+    for(let k=0;k<n;k++) idxs.push(Math.max(1,Math.floor((k+1)/(n+1)*(path.length-1))));
+  }
+  // unique + sorted
+  const uniq=[...new Set(idxs)].sort((a,b)=>a-b);
+  while(uniq.length<n){
+    const j = Math.floor(Math.random()*(path.length-2))+1;
+    if(!uniq.includes(j)) uniq.push(j);
+    uniq.sort((a,b)=>a-b);
+  }
+
+  /* --- build checkpoints with clues --- */
+  const at=(x,y)=>cells[y*cols+x];
+  state.checkpoints = uniq.map((pi,k)=>{
+    const dIn  = dirBetween(path[pi-1],path[pi]);
+    const dOut = dirBetween(path[pi],path[pi+1]);
+    const vin  = DIRS[dIn], vout = DIRS[dOut];
+    const cross = vin.dx*vout.dy - vin.dy*vout.dx;
+    const turn  = cross>0 ? 'right' : cross<0 ? 'left' : 'straight';
+
+    /* --- decoy branch straight ahead --- */
+    const c = path[pi];
+    const nx = c.x + DIRS[dIn].dx, ny = c.y + DIRS[dIn].dy;
+    if(nx>=0&&ny>=0&&nx<cols&&ny<rows){
+      const nxt = path[pi+1];
+      const isNext = nxt && nxt.x===nx && nxt.y===ny;
+      if(!isNext){
+        c.walls[dIn] = false;
+        at(nx,ny).walls[(dIn+2)%4] = false;
+        state.decoy.set(pi, at(nx,ny));
+      }
+    }
+
+    return {
+      index: pi,
+      cell: path[pi],
+      required: turn,
+      clue: makeClue(turn),
+      visited: false
+    };
+  });
+
+  resetRun();
+  renderClues();
+  updateHud();
+}
+
+function makeClue(required){
+  const probs = shuffle([...PROBLEMS]);
+  for(const p of probs){
+    for(const r of RULES){
+      if(r.fn(p.a) === required){
+        return {q:p.q, a:p.a, topic:p.topic, rule:r.text, dir:required};
+      }
+    }
+  }
+  return {q:'3 + 4', a:7, topic:'Arithmetic', rule:'placeholder', dir:required};
+}
+
+/* ==========================================================================
+   BLOCK DEFINITIONS
+   ========================================================================== */
+const COND_OPTS = [
+  {v:'anyCP',   t:'has reached a checkpoint'},
+  {v:'cp1',     t:'at checkpoint 1'},
+  {v:'cp2',     t:'at checkpoint 2'},
+  {v:'cp3',     t:'at checkpoint 3'},
+  {v:'cp4',     t:'at checkpoint 4'},
+  {v:'goal',    t:'at the goal'},
+  {v:'over',    t:'speed is over the limit'},
+  {v:'slow',    t:'speed is under 30 %'},
+  {v:'late',    t:'time > 30 seconds'}
+];
+
+const BLOCK_DEFS = {
+  forever:{ cat:'control', text:'forever', body:true },
+  repeat: { cat:'control', text:'repeat [n] times', body:true,
+            fields:[{k:'n',type:'num',def:4}] },
+  if:     { cat:'control', text:'if [cond] then', body:true,
+            fields:[{k:'cond',type:'sel',opts:COND_OPTS,def:'anyCP'}] },
+  wait:   { cat:'control', text:'wait [n] seconds',
+            fields:[{k:'n',type:'num',def:1}] },
+
+  lineFollow:{ cat:'motion', text:'do line following until [mode]',
+            fields:[{k:'mode',type:'sel',
+              opts:[{v:'cp',t:'next checkpoint'},{v:'goal',t:'the goal'}],def:'cp'}] },
+  turn:   { cat:'motion', text:'turn [dir] [n] degrees',
+            fields:[{k:'dir',type:'sel',opts:[{v:'left',t:'left'},{v:'right',t:'right'}],def:'left'},
+                    {k:'n',type:'num',def:90}] },
+  setSpeed:{ cat:'motion', text:'set speed to [n] %',
+            fields:[{k:'n',type:'num',def:50}] },
+  forward:{ cat:'motion', text:'go forward [n] steps',
+            fields:[{k:'n',type:'num',def:1}] },
+  stop:   { cat:'motion', text:'stop' }
+};
+
+const PALETTE = [
+  {group:'Control', items:['forever','repeat','if','wait']},
+  {group:'Motion',  items:['lineFollow','turn','setSpeed','forward','stop']}
+];
+
+/* ---------------- script model ---------------- */
+let script = [{ type:'hat', body:[] }];
+
+function makeBlock(type){
+  const def = BLOCK_DEFS[type];
+  const b = { type, fields:{} };
+  if(def.fields) def.fields.forEach(f=> b.fields[f.k] = f.def);
+  if(def.body) b.body = [];
+  return b;
+}
+
+/* ==========================================================================
+   PALETTE / SCRIPT UI
+   ========================================================================== */
+const paletteEl = document.getElementById('palette');
+const scriptEl  = document.getElementById('script');
+
+function buildPalette(){
+  paletteEl.innerHTML='';
+  PALETTE.forEach(g=>{
+    const lab=document.createElement('div');
+    lab.className='cat-label'; lab.textContent=g.group;
+    paletteEl.appendChild(lab);
+    g.items.forEach(t=>{
+      const def=BLOCK_DEFS[t];
+      const el=document.createElement('div');
+      el.className='pblock '+def.cat;
+      el.textContent=def.text.replace(/\[(\w+)\]/g,(m,k)=>'('+k+')');
+      el.draggable=true;
+      el.addEventListener('dragstart',e=>{
+        e.dataTransfer.setData('text/plain',t);
+        e.dataTransfer.effectAllowed='copy';
+      });
+      el.addEventListener('click',()=>{
+        script[0].body.push(makeBlock(t));
+        renderScript();
+      });
+      paletteEl.appendChild(el);
+    });
+  });
+}
+
+function renderScript(){
+  scriptEl.innerHTML='';
+  scriptEl.appendChild(renderBlock(script[0], script, 0));
+}
+
+function bodyDiv(blk){
+  const d=document.createElement('div');
+  d.className='body';
+  const arr = blk.body;
+  if(!arr.length){
+    const h=document.createElement('div');
+    h.className='hint'; h.textContent='drop blocks here';
+    d.appendChild(h);
+  } else {
+    arr.forEach((b,i)=> d.appendChild(renderBlock(b, arr, i)));
+  }
+  d.addEventListener('dragover',e=>{ e.preventDefault(); e.stopPropagation(); d.classList.add('over'); });
+  d.addEventListener('dragleave',e=>{ d.classList.remove('over'); });
+  d.addEventListener('drop',e=>{
+    e.preventDefault(); e.stopPropagation();
+    d.classList.remove('over');
+    const type=e.dataTransfer.getData('text/plain');
+    if(!BLOCK_DEFS[type]) return;
+    arr.push(makeBlock(type));
+    renderScript();
+  });
+  return d;
+}
+
+function renderBlock(blk, arr, idx){
+  const def = BLOCK_DEFS[blk.type];
+  const el = document.createElement('div');
+  el.className = 'block ' + (blk.type==='hat' ? 'hat' : def.cat);
+  el._blk = blk;
+
+  const head = document.createElement('div');
+  head.className='block-head';
+
+  const label = document.createElement('span');
+  label.className='block-label';
+
+  if(blk.type==='hat'){
+    label.innerHTML='🚩 when flag clicked';
+  } else {
+    const html = def.text.replace(/\[(\w+)\]/g, (m,k)=>{
+      const f = def.fields.find(x=>x.k===k);
+      if(!f) return '';
+      if(f.type==='num')
+        return `<input type="number" data-k="${k}" value="${blk.fields[k] ?? f.def}">`;
+      const opts = f.opts.map(o=>{
+        const v = (typeof o==='string')?o:o.v;
+        const t = (typeof o==='string')?o:o.t;
+        return `<option value="${v}" ${String(blk.fields[k])===String(v)?'selected':''}>${t}</option>`;
+      }).join('');
+      return `<select data-k="${k}">${opts}</select>`;
+    });
+    label.innerHTML = html;
+  }
+  head.appendChild(label);
+
+  if(blk.type!=='hat'){
+    const del=document.createElement('button');
+    del.className='del'; del.textContent='✕';
+    del.addEventListener('click',()=>{ arr.splice(idx,1); renderScript(); });
+    head.appendChild(del);
+  }
+  el.appendChild(head);
+
+  if(def && def.body) el.appendChild(bodyDiv(blk));
+  return el;
+}
+
+scriptEl.addEventListener('change', e=>{
+  const inp = e.target;
+  if(!inp.dataset || !inp.dataset.k) return;
+  const blkEl = inp.closest('.block');
+  if(!blkEl || !blkEl._blk) return;
+  const v = inp.type==='number' ? (parseFloat(inp.value)||0) : inp.value;
+  blkEl._blk.fields[inp.dataset.k] = v;
+});
+
+/* ==========================================================================
+   PROGRAM INTERPRETER
+   ========================================================================== */
+const program = { running:false, stack:[], blocked:null, waitTimer:0 };
+
+function evalCond(c){
+  switch(c){
+    case 'anyCP': return state.atCP !== null;
+    case 'cp1':   return state.atCP === 0;
+    case 'cp2':   return state.atCP === 1;
+    case 'cp3':   return state.atCP === 2;
+    case 'cp4':   return state.atCP === 3;
+    case 'goal':  return state.finished;
+    case 'over':  return state.robot.targetSpeedPct > state.speedLimit;
+    case 'slow':  return state.robot.targetSpeedPct < 30;
+    case 'late':  return state.elapsed > 30;
+  }
+  return false;
+}
+
+function runBlock(blk){
+  const r = state.robot;
+  switch(blk.type){
+    case 'forever':
+      program.stack.push({body:blk.body,index:0,loop:true});
+      return 'ok';
+    case 'repeat':
+      program.stack.push({body:blk.body,index:0,repeat:Math.max(1,blk.fields.n|0),count:0});
+      return 'ok';
+    case 'if':
+      if(evalCond(blk.fields.cond)) program.stack.push({body:blk.body,index:0});
+      return 'ok';
+    case 'wait':
+      program.waitTimer = Math.max(0.05, +blk.fields.n || 1);
+      return 'pause';
+    case 'setSpeed':
+      r.targetSpeedPct = clamp(+blk.fields.n || 0, 0, 120);
+      r.targetSpeed = r.targetSpeedPct * PX_PER_PCT;
+      return 'ok';
+    case 'turn': {
+      const dir = blk.fields.dir==='left' ? -1 : 1;
+      const ang = ((+blk.fields.n)||90) * Math.PI/180;
+      r.turnDir = dir; r.turnRemaining = ang;
+      state.mode = 'turning';
+      program.blocked = {done:false};
+      return 'pause';
+    }
+    case 'lineFollow':
+      startFollowing(blk.fields.mode);
+      return 'pause';
+    case 'forward': {
+      const n = Math.max(0.2, +blk.fields.n||1);
+      if(!r.route){ return 'ok'; }
+      r.targetProgress = r.s + n*CELL;
+      state.mode = 'creeping';
+      program.blocked = {done:false};
+      return 'pause';
+    }
+    case 'stop':
+      endProgram('stopped');
+      return 'pause';
+  }
+  return 'ok';
+}
+
+function tick(dt){
+  if(!program.running) return;
+  if(program.blocked){
+    if(!program.blocked.done) return;
+    program.blocked = null;
+  }
+  if(program.waitTimer > 0){
+    program.waitTimer -= dt;
+    if(program.waitTimer > 0) return;
+  }
+  let guard=0;
+  while(guard++ < 800){
+    const frame = program.stack[program.stack.length-1];
+    if(!frame){ endProgram('finished'); return; }
+    if(frame.index >= frame.body.length){
+      if(frame.loop){ frame.index=0; continue; }
+      if(frame.repeat !== undefined){
+        frame.count++;
+        if(frame.count < frame.repeat){ frame.index=0; continue; }
+      }
+      program.stack.pop();
+      continue;
+    }
+    const blk = frame.body[frame.index];
+    frame.index++;
+    const res = runBlock(blk);
+    if(res === 'pause') return;
+  }
+}
+
+/* ==========================================================================
+   ROUTE / FOLLOWING
+   ========================================================================== */
+function routePointsFrom(i){ return state.path.slice(i).map(cellCenter); }
+function routeLength(route){ return (route.points.length-1)*CELL; }
+
+function pointAt(route, s){
+  const pts = route.points;
+  if(pts.length===1) return {...pts[0]};
+  const seg = clamp(Math.floor(s/CELL), 0, pts.length-2);
+  const t   = clamp((s - seg*CELL)/CELL, 0, 1);
+  const a=pts[seg], b=pts[seg+1];
+  return { x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t };
+}
+
+function attachRoute(){
+  const r = state.robot;
+  const i = state.atCP;
+  if(i === null) return null;
+
+  const branches = [];
+  // main branch
+  if(i < state.path.length-1){
+    const dOut = dirBetween(state.path[i], state.path[i+1]);
+    branches.push({ dir: DIRS[dOut].ang, type:'main' });
+  }
+  // decoy branch (straight on)
+  const dec = state.decoy.get(state.checkpoints[i].index);
+  if(dec){
+    const dIn = dirBetween(state.path[i-1], state.path[i]);
+    branches.push({ dir: DIRS[dIn].ang, type:'decoy', cell:dec });
+  }
+
+  let best=null, bestDiff=Infinity;
+  for(const b of branches){
+    const d = Math.abs(angDiff(r.heading, b.dir));
+    if(d < bestDiff){ bestDiff=d; best=b; }
+  }
+  if(!best || bestDiff > Math.PI/3) return null;
+
+  r.heading = best.dir;
+
+  if(best.type === 'main'){
+    return { points: routePointsFrom(i), startIndex:i, isMain:true };
+  } else {
+    return { points:[ cellCenter(state.path[i]), cellCenter(best.cell) ],
+             startIndex:i, isMain:false };
+  }
+}
+
+function startFollowing(mode){
+  const r = state.robot;
+  if(!r.route){
+    const route = attachRoute();
+    if(!route){
+      fail('⚠ No line ahead — the robot is off the track. Check the turn direction in your script.');
+      return;
+    }
+    r.route = route;
+    r.s = 0;
+    state.atCP = null;
+  }
+  state.mode = 'following';
+  program.blocked = { done:false, kind:'follow', until:mode };
+}
+
+/* ==========================================================================
+   ROBOT PHYSICS / UPDATE
+   ========================================================================== */
+function updateRobot(dt){
+  const r = state.robot;
+
+  /* ----- turning in place ----- */
+  if(state.mode === 'turning'){
+    const step = Math.min(r.turnRemaining, TURN_RATE*dt);
+    r.heading += r.turnDir * step;
+    r.turnRemaining -= step;
+    if(r.turnRemaining <= 1e-4){
+      state.mode='idle';
+      if(program.blocked) program.blocked.done = true;
+    }
+    return;
+  }
+
+  /* ----- creeping forward ----- */
+  if(state.mode === 'creeping' && r.route){
+    const L = routeLength(r.route);
+    const accel = 900;
+    r.speed = Math.min(r.targetSpeed, r.speed + accel*dt);
+    r.s = Math.min(r.targetProgress, L);
+    const p = pointAt(r.route, r.s);
+    r.x=p.x; r.y=p.y;
+    if(r.s >= r.targetProgress - 0.5 || r.s >= L){
+      r.speed = 0;
+      state.mode='idle';
+      if(program.blocked) program.blocked.done = true;
+    }
+    return;
+  }
+
+  /* ----- line following ----- */
+  if(state.mode === 'following' && r.route){
+    const L = routeLength(r.route);
+    const accel = 400;
+    r.speed = Math.min(r.targetSpeed, r.speed + accel*dt);
+
+    /* physics: cornering gets sloppy above the speed limit */
+    if(r.targetSpeedPct > state.speedLimit){
+      state.overSpeed += dt;
+    } else {
+      state.overSpeed = Math.max(0, state.overSpeed - dt*0.4);
+    }
+
+    const prevS = r.s;
+    r.s = Math.min(r.s + r.speed*dt, L);
+    state.distance += (r.s - prevS) * 0.5; // 1 cell = 50 cm
+
+    const p = pointAt(r.route, r.s);
+    r.x=p.x; r.y=p.y;
+
+    const aheadS = Math.min(r.s + 26, L);
+    const a = pointAt(r.route, aheadS);
+    let th = r.heading;
+    if(aheadS - r.s > 2) th = Math.atan2(a.y-p.y, a.x-p.x);
+
+    const speedFactor = clamp(120 / Math.max(60, r.speed), 0.35, 1.6);
+    r.heading = angLerp(r.heading, th, clamp(dt*9*speedFactor, 0, 1));
+
+    /* ----- arrival tests ----- */
+    const pIdx = r.route.startIndex + r.s/CELL;
+
+    if(r.route.isMain){
+      const blockUntil = program.blocked && program.blocked.kind==='follow'
+                         ? program.blocked.until : null;
+
+      if(state.nextCP < state.checkpoints.length){
+        const cp = state.checkpoints[state.nextCP];
+        if(pIdx >= cp.index - 0.02 && blockUntil !== 'goal'){
+          arriveAtCheckpoint(state.nextCP);
+          return;
+        }
+      }
+      if(pIdx >= state.path.length - 1 - 0.02){
+        reachGoal();
+        return;
+      }
+    }
+
+    if(r.s >= L - 0.4){
+      // end of route
+      if(r.route.isMain){
+        reachGoal();
+      } else {
+        fail('🚧 Dead end — the decoy line stops here. The robot took the wrong branch.');
+      }
+      return;
+    }
+    return;
+  }
+
+  /* ----- idle: friction ----- */
+  r.speed = Math.max(0, r.speed - 500*dt);
+}
+
+function arriveAtCheckpoint(k){
+  const r = state.robot;
+  const cp = state.checkpoints[k];
+  const c  = cp.cell;
+  const p  = cellCenter(c);
+
+  r.x=p.x; r.y=p.y; r.s=0; r.speed=0;
+  const dIn = dirBetween(state.path[cp.index-1], state.path[cp.index]);
+  r.heading = DIRS[dIn].ang;
+  r.route = null;
+
+  state.atCP = k;
+  state.nextCP = k+1;
+  cp.visited = true;
+  state.mode = 'idle';
+
+  if(program.blocked) program.blocked.done = true;
+  renderClues();
+  updateHud();
+}
+
+function reachGoal(){
+  const r = state.robot;
+  r.speed = 0;
+  state.mode = 'idle';
+  state.finished = true;
+  const all = state.visited.length === state.checkpoints.length;
+  endProgram('success', all);
+}
+
+/* ==========================================================================
+   RUN CONTROL
+   ========================================================================== */
+function resetRun(){
+  const r = state.robot;
+  program.running=false;
+  program.stack=[]; program.blocked=null; program.waitTimer=0;
+
+  state.mode='idle';
+  state.elapsed=0; state.distance=0;
+  state.visited=[]; state.nextCP=0; state.atCP=null;
+  state.overSpeed=0; state.message=''; state.success=false; state.finished=false;
+
+  if(state.checkpoints) state.checkpoints.forEach(c=>c.visited=false);
+
+  const path = state.path;
+  if(path && path.length>1){
+    r.heading = DIRS[dirBetween(path[0],path[1])].ang;
+  } else {
+    r.heading = 0;
+  }
+  r.speed=0; r.targetSpeedPct=50; r.targetSpeed=50*PX_PER_PCT;
+  r.s=0;
+  r.route = path && path.length>1
+    ? { points: routePointsFrom(0), startIndex:0, isMain:true }
+    : null;
+  if(r.route){
+    const p = pointAt(r.route, 0);
+    r.x=p.x; r.y=p.y;
+  } else { r.x=CELL/2; r.y=CELL/2; }
+
+  banner('Drag blocks into the script area, then press ▶ Run.');
+  renderClues();
+  updateHud();
+}
+
+function startRun(){
+  resetRun();
+  if(!script[0].body.length){
+    banner('Your script is empty. Drag some blocks in first!', 'err');
+    return;
+  }
+  program.running = true;
+  program.stack = [{ body: script[0].body, index:0, loop:false }];
+  program.blocked = null;
+  program.waitTimer = 0;
+  banner('▶ Running…');
+}
+
+function endProgram(status, allCp){
+  program.running = false;
+  program.blocked = null;
+  state.mode = 'idle';
+  state.robot.speed = 0;
+
+  if(status === 'success'){
+    state.success = true;
+    const speedPct = state.robot.targetSpeedPct;
+    let msg = `🏁 Goal reached in ${state.elapsed.toFixed(1)} s  ·  ${Math.round(state.distance)} cm travelled`;
+    if(!allCp) msg += `  ·  ⚠ ${state.checkpoints.length - state.visited.length} checkpoint(s) missed`;
+    if(state.overSpeed > 1.5) msg += `  ·  ⚠ speed limit exceeded for ${state.overSpeed.toFixed(1)} s`;
+    banner(msg, 'ok');
+  } else if(status === 'failed'){
+    state.success = false;
+    banner(state.message || 'Run failed.', 'err');
+  } else if(status === 'stopped'){
+    state.success = false;
+    banner('⏹ Stopped by the script or the Stop button.');
+  } else {
+    state.success = false;
+    banner('Script finished but the robot is not at the goal. Add a forever loop or more line-following blocks.', 'err');
+  }
+}
+
+function fail(msg){
+  state.message = msg;
+  endProgram('failed');
+}
+
+/* ==========================================================================
+   RENDERING
+   ========================================================================== */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+cv.width = W; cv.height = H;
+
+function cellAt(x,y){ return state.cells[y*COLS+x]; }
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0b1220';
+  ctx.fillRect(0,0,W,H);
+
+  /* floors */
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    ctx.fillStyle='#101c31';
+    ctx.fillRect(x*CELL+1.5, y*CELL+1.5, CELL-3, CELL-3);
+  }
+
+  /* walls */
+  ctx.strokeStyle='#22304a';
+  ctx.lineWidth=3;
+  ctx.lineCap='square';
+  ctx.beginPath();
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const c=cellAt(x,y), px=x*CELL, py=y*CELL;
+    if(c.walls[0]){ ctx.moveTo(px,py); ctx.lineTo(px+CELL,py); }
+    if(c.walls[3]){ ctx.moveTo(px,py); ctx.lineTo(px,py+CELL); }
+    if(y===ROWS-1 && c.walls[2]){ ctx.moveTo(px,py+CELL); ctx.lineTo(px+CELL,py+CELL); }
+    if(x===COLS-1 && c.walls[1]){ ctx.moveTo(px+CELL,py); ctx.lineTo(px+CELL,py+CELL); }
+  }
+  ctx.stroke();
+
+  /* decoy stubs */
+  ctx.strokeStyle='#c9a52b';
+  ctx.lineWidth=8;
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath();
+  state.decoy.forEach((cell, pi)=>{
+    const a = cellCenter(state.path[pi]);
+    const b = cellCenter(cell);
+    ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+  });
+  ctx.stroke();
+
+  /* main line */
+  ctx.strokeStyle='#ffd93d';
+  ctx.lineWidth=9;
+  ctx.beginPath();
+  state.path.forEach((c,i)=>{
+    const p=cellCenter(c);
+    i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y);
+  });
+  ctx.stroke();
+
+  /* start marker */
+  if(state.path.length){
+    const s = cellCenter(state.path[0]);
+    ctx.fillStyle='#2f9e6b';
+    ctx.beginPath(); ctx.arc(s.x,s.y,11,0,7); ctx.fill();
+    ctx.fillStyle='#04140c'; ctx.font='bold 11px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('S', s.x, s.y+0.5);
+  }
+
+  /* goal marker */
+  if(state.path.length){
+    const g = cellCenter(state.path[state.path.length-1]);
+    ctx.strokeStyle='#3ddc84'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(g.x,g.y,15,0,7); ctx.stroke();
+    ctx.fillStyle='#3ddc84';
+    ctx.beginPath(); ctx.arc(g.x,g.y,7,0,7); ctx.fill();
+    ctx.fillStyle='#04140c'; ctx.font='bold 10px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('G', g.x, g.y+0.5);
+  }
+
+  /* checkpoints */
+  state.checkpoints.forEach((cp,i)=>{
+    const p = cellCenter(cp.cell);
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,16,0,7);
+    ctx.fillStyle = cp.visited ? 'rgba(61,220,132,.25)' : 'rgba(56,189,248,.22)';
+    ctx.fill();
+    ctx.lineWidth = state.atCP===i ? 4 : 2.5;
+    ctx.strokeStyle = cp.visited ? '#3ddc84' : '#38bdf8';
+    ctx.stroke();
+
+    ctx.fillStyle = cp.visited ? '#3ddc84' : '#38bdf8';
+    ctx.font='bold 14px system-ui';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(String(i+1), p.x, p.y+0.5);
+  });
+
+  /* robot */
+  const r = state.robot;
+  ctx.save();
+  ctx.translate(r.x,r.y);
+  ctx.rotate(r.heading);
+
+  ctx.fillStyle='#4c97ff';
+  ctx.strokeStyle='#dbe9ff';
+  ctx.lineWidth=2;
+  roundRect(ctx,-15,-11,30,22,7);
+  ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); ctx.moveTo(16,0); ctx.lineTo(5,-6); ctx.lineTo(5,6); ctx.closePath(); ctx.fill();
+
+  ctx.fillStyle='#ff5a5a';
+  ctx.beginPath(); ctx.arc(11,-8,3,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(11, 8,3,0,7); ctx.fill();
+
+  ctx.restore();
+}
+
+function roundRect(c,x,y,w,h,rad){
+  c.beginPath();
+  c.moveTo(x+rad,y);
+  c.arcTo(x+w,y,x+w,y+h,rad);
+  c.arcTo(x+w,y+h,x,y+h,rad);
+  c.arcTo(x,y+h,x,y,rad);
+  c.arcTo(x,y,x+w,y,rad);
+  c.closePath();
+}
+
+/* ==========================================================================
+   HUD / PANELS
+   ========================================================================== */
+function updateHud(){
+  document.getElementById('sTime').textContent  = state.elapsed.toFixed(1)+' s';
+  document.getElementById('sDist').textContent  = Math.round(state.distance)+' cm';
+  document.getElementById('sCp').textContent    = state.visited.length+' / '+state.checkpoints.length;
+  const sp = document.getElementById('sSpeed');
+  sp.textContent = Math.round(state.robot.targetSpeedPct)+' %';
+  sp.className = state.robot.targetSpeedPct > state.speedLimit ? 'warn' : 'good';
+  document.getElementById('sLimit').textContent = state.speedLimit+' %';
+  const v = document.getElementById('sViol');
+  v.textContent = state.overSpeed > 1.0 ? state.overSpeed.toFixed(1)+' s' : '0';
+  v.className = state.overSpeed > 1.0 ? 'bad' : '';
+}
+
+function banner(text, cls){
+  const b = document.getElementById('banner');
+  b.textContent = text;
+  b.className = cls || '';
+}
+
+function renderClues(){
+  const list = document.getElementById('clueList');
+  list.innerHTML='';
+  state.checkpoints.forEach((cp,i)=>{
+    const d = document.createElement('div');
+    d.className = 'clue' + (cp.visited ? ' done' : '');
+    d.innerHTML =
+      `<b>Checkpoint ${i+1}</b> · ${cp.clue.topic}<br>` +
+      `${cp.clue.q} = <span class="ans">${cp.clue.a}</span>` +
+      `<span class="rule">Rule → ${cp.clue.rule}</span>`;
+    list.appendChild(d);
+  });
+  if(!state.checkpoints.length) list.innerHTML = '<p>No checkpoints.</p>';
+}
+
+function renderMazeInfo(){
+  const cfg = MAZE_TYPES[state.typeKey];
+  document.getElementById('mtName').textContent = cfg.name;
+  document.getElementById('mtDesc').textContent = cfg.desc;
+  document.getElementById('mtEx').textContent   = cfg.ex;
+}
+
+/* ==========================================================================
+   MAIN LOOP
+   ========================================================================== */
+let lastT = performance.now();
+let hudAcc = 0;
+
+function loop(t){
+  const dt = Math.min(0.05, (t-lastT)/1000);
+  lastT = t;
+
+  if(program.running){
+    state.elapsed += dt;
+    tick(dt);
+  }
+  if(program.running || state.mode!=='idle' || state.robot.speed>0){
+    updateRobot(dt);
+  }
+
+  hudAcc += dt;
+  if(hudAcc > 0.08){ hudAcc=0; updateHud(); }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* ==========================================================================
+   INIT
+   ========================================================================== */
+function init(){
+  const sel = document.getElementById('mazeType');
+  Object.keys(MAZE_TYPES).forEach(k=>{
+    const o=document.createElement('option');
+    o.value=k; o.textContent=MAZE_TYPES[k].name;
+    sel.appendChild(o);
+  });
+  sel.value='waypoint';
+  sel.addEventListener('change',()=>{
+    buildMaze(sel.value);
+    renderMazeInfo();
+  });
+
+  document.getElementById('newMaze').addEventListener('click',()=>{
+    buildMaze(sel.value);
+    renderMazeInfo();
+  });
+  document.getElementById('runBtn').addEventListener('click', startRun);
+  document.getElementById('stopBtn').addEventListener('click', ()=>{
+    if(program.running) endProgram('stopped');
+  });
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    resetRun();
+  });
+
+  /* starter script */
+  const forever = makeBlock('forever');
+  forever.body.push(makeBlock('lineFollow'));
+  script[0].body.push(forever);
+
+  buildPalette();
+  renderScript();
+  buildMaze('waypoint');
+  renderMazeInfo();
+  requestAnimationFrame(loop);
+}
+
+init();
+</script>
+</body>
+</html>
