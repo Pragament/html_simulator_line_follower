@@ -23,8 +23,10 @@
     background:#152238;color:#e6edf7;padding:6px 9px;outline:none;
   }
   button{cursor:pointer;transition:.15s}
-  button:hover{background:#1d2f4d;border-color:#3d5party}
-  button:hover{background:#1d2f4d}
+
+  /* 🔧 CHANGE 1A: Fixed CSS color typo (#3d5party -> #3d5a80) and removed duplicate selector */
+  button:hover{background:#1d2f4d;border-color:#3d5a80}
+
   button.primary{background:#1f6feb;border-color:#1f6feb;color:#fff;font-weight:600}
   button.primary:hover{background:#2b7dff}
   button.danger{background:#a1263c;border-color:#a1263c;color:#fff}
@@ -49,8 +51,9 @@
     font-size:12.5px;font-weight:600;color:#fff;cursor:grab;
     border:1px solid rgba(255,255,255,.14);
     box-shadow:0 2px 0 rgba(0,0,0,.35);
-    user-select:none;
+    user-select:none;transition:transform .1s;
   }
+  .pblock:hover{transform:translateX(2px)}
   .pblock:active{cursor:grabbing}
   .pblock.motion{background:linear-gradient(180deg,#4c97ff,#3d7fd6)}
   .pblock.control{background:linear-gradient(180deg,#ffab19,#e0900c)}
@@ -62,10 +65,17 @@
     font-size:12.5px;font-weight:600;color:#fff;
     border:1px solid rgba(255,255,255,.14);
     box-shadow:0 2px 0 rgba(0,0,0,.35);
+    user-select:none;cursor:grab;
   }
+  .block:active{cursor:grabbing}
   .block.motion{background:#3d7fd6}
   .block.control{background:#d9920f}
-  .block.hat{background:#2f9e6b}
+  .block.hat{background:#2f9e6b;border-radius:12px 12px 8px 8px;cursor:default}
+
+  /* 🔧 CHANGE 1B: Visual insertion indicators for drag-and-drop */
+  .block.drop-insert-above{border-top:3px solid #ffd93d}
+  .block.drop-insert-below{border-bottom:3px solid #ffd93d}
+
   .block-head{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
   .block-label{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
   .block input[type=number]{
@@ -83,13 +93,21 @@
   .block .del:hover{color:#fff;background:rgba(0,0,0,.2);border-radius:4px}
 
   .body{
-    margin:6px 0 2px 14px;padding:6px 6px 6px 12px;
+    margin:6px 0 2px 14px;padding:6px 6px 6px 10px;
     border-left:3px solid rgba(255,255,255,.28);
-    border-radius:0 0 0 8px;min-height:20px;
-    background:rgba(0,0,0,.13);
+    border-radius:0 0 0 8px;min-height:28px;
+    background:rgba(0,0,0,.15);
+    transition:background .15s, outline .15s;
   }
-  .body.over{background:rgba(255,255,255,.18);outline:1.5px dashed #fff}
-  .body .hint{font-size:11px;color:rgba(255,255,255,.5);font-weight:500;font-style:italic}
+
+  /* 🔧 CHANGE 1C: Specific neat layout for hat block's direct container */
+  .block.hat > .body{
+    margin:6px 0 2px 0;padding:6px 4px;
+    border-left:none;background:rgba(0,0,0,.12);
+    border-radius:6px;min-height:36px;
+  }
+  .body.over{background:rgba(255,255,255,.2);outline:1.5px dashed #ffd93d}
+  .body .hint{font-size:11px;color:rgba(255,255,255,.55);font-weight:500;font-style:italic;padding:4px 2px}
 
   /* ---------- MAIN ---------- */
   main{flex:1;display:flex;flex-direction:column;overflow-y:auto;padding:12px;gap:10px;align-items:center}
@@ -123,9 +141,14 @@
   .clue.done{border-left-color:#3ddc84;opacity:.65}
   .clue .ans{color:#3ddc84;font-weight:700}
   #clueList{max-height:230px;overflow-y:auto}
+
+  /* 🔧 CHANGE 1D: Allow scrolling when screen width is under 1100px */
   @media(max-width:1100px){
+    body{overflow:auto}
     #app{flex-direction:column;height:auto}
-    #left{width:100%;min-width:0;height:60vh;border-right:none;border-bottom:1px solid #1e2b44}
+    #left{width:100%;min-width:0;height:auto;border-right:none;border-bottom:1px solid #1e2b44}
+    #palette{max-height:220px}
+    #script{max-height:350px}
     #info{grid-template-columns:1fr}
   }
 </style>
@@ -254,6 +277,7 @@ const PROBLEMS = [
   {q:'half of 90, plus 5',                                      a:50, topic:'Arithmetic'}
 ];
 
+/* 🔧 CHANGE 7A: Replaced ambiguous 'straight' rules with unambiguous left/right rules */
 const RULES = [
   {text:'EVEN answer → turn RIGHT · ODD answer → turn LEFT',
    fn:a => a % 2 === 0 ? 'right' : 'left'},
@@ -265,10 +289,8 @@ const RULES = [
    fn:a => a >= 40 ? 'right' : 'left'},
   {text:'answer < 30 → turn LEFT · otherwise turn RIGHT',
    fn:a => a < 30 ? 'left' : 'right'},
-  {text:'multiple of 10 → go STRAIGHT · otherwise turn LEFT',
-   fn:a => a % 10 === 0 ? 'straight' : 'left'},
-  {text:'perfect square → go STRAIGHT · otherwise turn RIGHT',
-   fn:a => Number.isInteger(Math.sqrt(a)) ? 'straight' : 'right'}
+  {text:'divisible by 4 → turn RIGHT · otherwise turn LEFT',
+   fn:a => a % 4 === 0 ? 'right' : 'left'}
 ];
 
 /* ---------------- helpers ---------------- */
@@ -354,9 +376,9 @@ const state = {
   typeKey:'waypoint',
   mode:'idle',
   elapsed:0, distance:0, visited:[], nextCP:0, atCP:null,
-  overSpeed:0, message:'', success:false, finished:false,
+  overSpeed:0, totalOverSpeed:0, message:'', success:false, finished:false,
   robot:{ x:0,y:0,heading:0,speed:0,targetSpeed:120,targetSpeedPct:50,
-          s:0, route:null, turnDir:1, turnRemaining:0 }
+          s:0, route:null, turnDir:1, turnRemaining:0, targetProgress:0 }
 };
 
 /* ==========================================================================
@@ -385,7 +407,7 @@ function buildMaze(typeKey){
     if(d1!==d2) turns.push(i);
   }
 
-  /* --- pick checkpoint positions --- */
+  /* --- pick checkpoint positions (prefer distinct bends) --- */
   const n = cfg.cps;
   const idxs=[];
   if(turns.length >= n){
@@ -398,6 +420,12 @@ function buildMaze(typeKey){
   }
   // unique + sorted
   const uniq=[...new Set(idxs)].sort((a,b)=>a-b);
+  const remainingTurns = turns.filter(t => !uniq.includes(t));
+  while(uniq.length<n && remainingTurns.length > 0){
+    const pick = remainingTurns.splice(Math.floor(Math.random()*remainingTurns.length), 1)[0];
+    uniq.push(pick);
+    uniq.sort((a,b)=>a-b);
+  }
   while(uniq.length<n){
     const j = Math.floor(Math.random()*(path.length-2))+1;
     if(!uniq.includes(j)) uniq.push(j);
@@ -406,6 +434,10 @@ function buildMaze(typeKey){
 
   /* --- build checkpoints with clues --- */
   const at=(x,y)=>cells[y*cols+x];
+
+  /* 🔧 CHANGE 7B: Track usedQuestions so checkpoints don't show duplicate questions */
+  const usedQuestions = new Set();
+
   state.checkpoints = uniq.map((pi,k)=>{
     const dIn  = dirBetween(path[pi-1],path[pi]);
     const dOut = dirBetween(path[pi],path[pi+1]);
@@ -426,11 +458,14 @@ function buildMaze(typeKey){
       }
     }
 
+    const clue = makeClue(turn === 'straight' ? 'right' : turn, usedQuestions);
+    usedQuestions.add(clue.q);
+
     return {
       index: pi,
       cell: path[pi],
-      required: turn,
-      clue: makeClue(turn),
+      required: turn === 'straight' ? 'right' : turn,
+      clue: clue,
       visited: false
     };
   });
@@ -440,8 +475,18 @@ function buildMaze(typeKey){
   updateHud();
 }
 
-function makeClue(required){
+function makeClue(required, usedQuestions = new Set()){
   const probs = shuffle([...PROBLEMS]);
+  // First attempt: match required direction with an unused question
+  for(const p of probs){
+    if(usedQuestions.has(p.q)) continue;
+    for(const r of RULES){
+      if(r.fn(p.a) === required){
+        return {q:p.q, a:p.a, topic:p.topic, rule:r.text, dir:required};
+      }
+    }
+  }
+  // Fallback: any question matching rule
   for(const p of probs){
     for(const r of RULES){
       if(r.fn(p.a) === required){
@@ -449,7 +494,7 @@ function makeClue(required){
       }
     }
   }
-  return {q:'3 + 4', a:7, topic:'Arithmetic', rule:'placeholder', dir:required};
+  return {q:'3 + 4', a:7, topic:'Arithmetic', rule:'EVEN answer → turn RIGHT · ODD answer → turn LEFT', dir:'left'};
 }
 
 /* ==========================================================================
@@ -467,26 +512,28 @@ const COND_OPTS = [
   {v:'late',    t:'time > 30 seconds'}
 ];
 
+/* 🔧 CHANGE 2: Added 'hat' definition with body:true so script container renders properly */
 const BLOCK_DEFS = {
-  forever:{ cat:'control', text:'forever', body:true },
-  repeat: { cat:'control', text:'repeat [n] times', body:true,
-            fields:[{k:'n',type:'num',def:4}] },
-  if:     { cat:'control', text:'if [cond] then', body:true,
-            fields:[{k:'cond',type:'sel',opts:COND_OPTS,def:'anyCP'}] },
-  wait:   { cat:'control', text:'wait [n] seconds',
-            fields:[{k:'n',type:'num',def:1}] },
+  hat:      { cat:'hat', text:'when flag clicked', body:true },
+  forever:  { cat:'control', text:'forever', body:true },
+  repeat:   { cat:'control', text:'repeat [n] times', body:true,
+              fields:[{k:'n',type:'num',def:4}] },
+  if:       { cat:'control', text:'if [cond] then', body:true,
+              fields:[{k:'cond',type:'sel',opts:COND_OPTS,def:'anyCP'}] },
+  wait:     { cat:'control', text:'wait [n] seconds',
+              fields:[{k:'n',type:'num',def:1}] },
 
   lineFollow:{ cat:'motion', text:'do line following until [mode]',
-            fields:[{k:'mode',type:'sel',
-              opts:[{v:'cp',t:'next checkpoint'},{v:'goal',t:'the goal'}],def:'cp'}] },
-  turn:   { cat:'motion', text:'turn [dir] [n] degrees',
-            fields:[{k:'dir',type:'sel',opts:[{v:'left',t:'left'},{v:'right',t:'right'}],def:'left'},
-                    {k:'n',type:'num',def:90}] },
-  setSpeed:{ cat:'motion', text:'set speed to [n] %',
-            fields:[{k:'n',type:'num',def:50}] },
-  forward:{ cat:'motion', text:'go forward [n] steps',
-            fields:[{k:'n',type:'num',def:1}] },
-  stop:   { cat:'motion', text:'stop' }
+              fields:[{k:'mode',type:'sel',
+                opts:[{v:'cp',t:'next checkpoint'},{v:'goal',t:'the goal'}],def:'cp'}] },
+  turn:     { cat:'motion', text:'turn [dir] [n] degrees',
+              fields:[{k:'dir',type:'sel',opts:[{v:'left',t:'left'},{v:'right',t:'right'}],def:'left'},
+                      {k:'n',type:'num',def:90}] },
+  setSpeed: { cat:'motion', text:'set speed to [n] %',
+              fields:[{k:'n',type:'num',def:50}] },
+  forward:  { cat:'motion', text:'go forward [n] steps',
+              fields:[{k:'n',type:'num',def:1}] },
+  stop:     { cat:'motion', text:'stop' }
 };
 
 const PALETTE = [
@@ -496,6 +543,9 @@ const PALETTE = [
 
 /* ---------------- script model ---------------- */
 let script = [{ type:'hat', body:[] }];
+
+/* 🔧 CHANGE 6A: Added dragState to allow dragging existing blocks in script to reorder them */
+let dragState = null;
 
 function makeBlock(type){
   const def = BLOCK_DEFS[type];
@@ -524,11 +574,18 @@ function buildPalette(){
       el.textContent=def.text.replace(/\[(\w+)\]/g,(m,k)=>'('+k+')');
       el.draggable=true;
       el.addEventListener('dragstart',e=>{
+        dragState = { source:'palette', type:t };
         e.dataTransfer.setData('text/plain',t);
         e.dataTransfer.effectAllowed='copy';
       });
+
+      /* 🔧 CHANGE 5: Intelligently append clicked blocks inside forever loop instead of after it */
       el.addEventListener('click',()=>{
-        script[0].body.push(makeBlock(t));
+        let targetArr = script[0].body;
+        if(t !== 'forever' && targetArr.length > 0 && targetArr[targetArr.length-1].type === 'forever'){
+          targetArr = targetArr[targetArr.length-1].body;
+        }
+        targetArr.push(makeBlock(t));
         renderScript();
       });
       paletteEl.appendChild(el);
@@ -547,20 +604,31 @@ function bodyDiv(blk){
   const arr = blk.body;
   if(!arr.length){
     const h=document.createElement('div');
-    h.className='hint'; h.textContent='drop blocks here';
+    h.className='hint';
+    h.textContent = blk.type==='hat' ? 'drop blocks here or click from palette' : 'drop blocks here';
     d.appendChild(h);
   } else {
     arr.forEach((b,i)=> d.appendChild(renderBlock(b, arr, i)));
   }
   d.addEventListener('dragover',e=>{ e.preventDefault(); e.stopPropagation(); d.classList.add('over'); });
   d.addEventListener('dragleave',e=>{ d.classList.remove('over'); });
+
+  /* 🔧 CHANGE 6B: Handle dropping both from palette and moving blocks within the script */
   d.addEventListener('drop',e=>{
     e.preventDefault(); e.stopPropagation();
     d.classList.remove('over');
-    const type=e.dataTransfer.getData('text/plain');
-    if(!BLOCK_DEFS[type]) return;
-    arr.push(makeBlock(type));
-    renderScript();
+    if(dragState && dragState.source === 'script'){
+      const moved = dragState.arr.splice(dragState.idx, 1)[0];
+      arr.push(moved);
+      dragState = null;
+      renderScript();
+    } else {
+      const type=e.dataTransfer.getData('text/plain');
+      if(!BLOCK_DEFS[type]) return;
+      arr.push(makeBlock(type));
+      dragState = null;
+      renderScript();
+    }
   });
   return d;
 }
@@ -570,6 +638,57 @@ function renderBlock(blk, arr, idx){
   const el = document.createElement('div');
   el.className = 'block ' + (blk.type==='hat' ? 'hat' : def.cat);
   el._blk = blk;
+
+  /* 🔧 CHANGE 6C: Enable dragging on script blocks (except hat) to allow reordering */
+  if(blk.type !== 'hat'){
+    el.draggable = true;
+    el.addEventListener('dragstart', e => {
+      e.stopPropagation();
+      dragState = { source:'script', arr: arr, idx: idx, blk: blk };
+      e.dataTransfer.setData('text/plain', blk.type);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    el.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = el.getBoundingClientRect();
+      const isBelow = (e.clientY - rect.top) > (rect.height / 2);
+      el.classList.toggle('drop-insert-below', isBelow);
+      el.classList.toggle('drop-insert-above', !isBelow);
+    });
+
+    el.addEventListener('dragleave', () => {
+      el.classList.remove('drop-insert-above', 'drop-insert-below');
+    });
+
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isBelow = el.classList.contains('drop-insert-below');
+      el.classList.remove('drop-insert-above', 'drop-insert-below');
+
+      if(dragState && dragState.source === 'script'){
+        if(dragState.blk === blk) return;
+        const moved = dragState.arr.splice(dragState.idx, 1)[0];
+        let targetIdx = arr.indexOf(blk);
+        if(targetIdx === -1) targetIdx = idx;
+        if(isBelow) targetIdx++;
+        arr.splice(targetIdx, 0, moved);
+        dragState = null;
+        renderScript();
+      } else {
+        const type = e.dataTransfer.getData('text/plain');
+        if(!BLOCK_DEFS[type]) return;
+        let targetIdx = arr.indexOf(blk);
+        if(targetIdx === -1) targetIdx = idx;
+        if(isBelow) targetIdx++;
+        arr.splice(targetIdx, 0, makeBlock(type));
+        dragState = null;
+        renderScript();
+      }
+    });
+  }
 
   const head = document.createElement('div');
   head.className='block-head';
@@ -599,7 +718,11 @@ function renderBlock(blk, arr, idx){
   if(blk.type!=='hat'){
     const del=document.createElement('button');
     del.className='del'; del.textContent='✕';
-    del.addEventListener('click',()=>{ arr.splice(idx,1); renderScript(); });
+    del.addEventListener('click', e =>{
+      e.stopPropagation();
+      arr.splice(idx,1);
+      renderScript();
+    });
     head.appendChild(del);
   }
   el.appendChild(head);
@@ -608,13 +731,27 @@ function renderBlock(blk, arr, idx){
   return el;
 }
 
-scriptEl.addEventListener('change', e=>{
+/* 🔧 CHANGE 6D: Listen for both 'change' and 'input' events so typed numbers save instantly */
+function updateFieldFromEvent(e){
   const inp = e.target;
   if(!inp.dataset || !inp.dataset.k) return;
   const blkEl = inp.closest('.block');
   if(!blkEl || !blkEl._blk) return;
   const v = inp.type==='number' ? (parseFloat(inp.value)||0) : inp.value;
   blkEl._blk.fields[inp.dataset.k] = v;
+}
+
+scriptEl.addEventListener('change', updateFieldFromEvent);
+scriptEl.addEventListener('input', updateFieldFromEvent);
+
+scriptEl.addEventListener('dragover', e=>{ e.preventDefault(); });
+scriptEl.addEventListener('drop', e=>{
+  e.preventDefault();
+  const type = e.dataTransfer.getData('text/plain');
+  if(!BLOCK_DEFS[type]) return;
+  script[0].body.push(makeBlock(type));
+  dragState = null;
+  renderScript();
 });
 
 /* ==========================================================================
@@ -658,7 +795,8 @@ function runBlock(blk){
       return 'ok';
     case 'turn': {
       const dir = blk.fields.dir==='left' ? -1 : 1;
-      const ang = ((+blk.fields.n)||90) * Math.PI/180;
+      const deg = Math.abs(+blk.fields.n || 90);
+      const ang = deg * Math.PI/180;
       r.turnDir = dir; r.turnRemaining = ang;
       state.mode = 'turning';
       program.blocked = {done:false};
@@ -669,6 +807,7 @@ function runBlock(blk){
       return 'pause';
     case 'forward': {
       const n = Math.max(0.2, +blk.fields.n||1);
+      if(!r.route){ r.route = attachRoute(); }
       if(!r.route){ return 'ok'; }
       r.targetProgress = r.s + n*CELL;
       state.mode = 'creeping';
@@ -727,21 +866,26 @@ function pointAt(route, s){
   return { x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t };
 }
 
+/* 🔧 CHANGE 3: Fixed indexing bug in attachRoute() - use pi = cp.index instead of i */
 function attachRoute(){
   const r = state.robot;
   const i = state.atCP;
-  if(i === null) return null;
+  if(i === null || i === undefined) return null;
+
+  const cp = state.checkpoints[i];
+  if(!cp) return null;
+  const pi = cp.index; // pi is the true index in state.path
 
   const branches = [];
-  // main branch
-  if(i < state.path.length-1){
-    const dOut = dirBetween(state.path[i], state.path[i+1]);
+  // main branch: uses pi instead of i
+  if(pi < state.path.length-1){
+    const dOut = dirBetween(state.path[pi], state.path[pi+1]);
     branches.push({ dir: DIRS[dOut].ang, type:'main' });
   }
-  // decoy branch (straight on)
-  const dec = state.decoy.get(state.checkpoints[i].index);
+  // decoy branch: uses pi instead of i (fixes path[i-1] crash when i=0)
+  const dec = state.decoy.get(pi);
   if(dec){
-    const dIn = dirBetween(state.path[i-1], state.path[i]);
+    const dIn = dirBetween(state.path[pi-1], state.path[pi]);
     branches.push({ dir: DIRS[dIn].ang, type:'decoy', cell:dec });
   }
 
@@ -754,11 +898,12 @@ function attachRoute(){
 
   r.heading = best.dir;
 
+  // Uses pi instead of i (fixes robot teleporting to start of maze)
   if(best.type === 'main'){
-    return { points: routePointsFrom(i), startIndex:i, isMain:true };
+    return { points: routePointsFrom(pi), startIndex:pi, isMain:true };
   } else {
-    return { points:[ cellCenter(state.path[i]), cellCenter(best.cell) ],
-             startIndex:i, isMain:false };
+    return { points:[ cellCenter(state.path[pi]), cellCenter(best.cell) ],
+             startIndex:pi, isMain:false };
   }
 }
 
@@ -801,7 +946,9 @@ function updateRobot(dt){
     const L = routeLength(r.route);
     const accel = 900;
     r.speed = Math.min(r.targetSpeed, r.speed + accel*dt);
+    const prevS = r.s;
     r.s = Math.min(r.targetProgress, L);
+    state.distance += (r.s - prevS) * 0.5;
     const p = pointAt(r.route, r.s);
     r.x=p.x; r.y=p.y;
     if(r.s >= r.targetProgress - 0.5 || r.s >= L){
@@ -821,6 +968,8 @@ function updateRobot(dt){
     /* physics: cornering gets sloppy above the speed limit */
     if(r.targetSpeedPct > state.speedLimit){
       state.overSpeed += dt;
+      /* 🔧 CHANGE 8A: Track cumulative speeding duration in totalOverSpeed */
+      state.totalOverSpeed += dt;
     } else {
       state.overSpeed = Math.max(0, state.overSpeed - dt*0.4);
     }
@@ -890,6 +1039,12 @@ function arriveAtCheckpoint(k){
   state.atCP = k;
   state.nextCP = k+1;
   cp.visited = true;
+
+  /* 🔧 CHANGE 4: Add checkpoint to visited array so HUD and goal tests report correctly */
+  if(!state.visited.includes(k)){
+    state.visited.push(k);
+  }
+
   state.mode = 'idle';
 
   if(program.blocked) program.blocked.done = true;
@@ -917,7 +1072,7 @@ function resetRun(){
   state.mode='idle';
   state.elapsed=0; state.distance=0;
   state.visited=[]; state.nextCP=0; state.atCP=null;
-  state.overSpeed=0; state.message=''; state.success=false; state.finished=false;
+  state.overSpeed=0; state.totalOverSpeed=0; state.message=''; state.success=false; state.finished=false;
 
   if(state.checkpoints) state.checkpoints.forEach(c=>c.visited=false);
 
@@ -963,10 +1118,9 @@ function endProgram(status, allCp){
 
   if(status === 'success'){
     state.success = true;
-    const speedPct = state.robot.targetSpeedPct;
     let msg = `🏁 Goal reached in ${state.elapsed.toFixed(1)} s  ·  ${Math.round(state.distance)} cm travelled`;
     if(!allCp) msg += `  ·  ⚠ ${state.checkpoints.length - state.visited.length} checkpoint(s) missed`;
-    if(state.overSpeed > 1.5) msg += `  ·  ⚠ speed limit exceeded for ${state.overSpeed.toFixed(1)} s`;
+    if(state.totalOverSpeed > 0.5) msg += `  ·  ⚠ speed limit exceeded for ${state.totalOverSpeed.toFixed(1)} s`;
     banner(msg, 'ok');
   } else if(status === 'failed'){
     state.success = false;
@@ -1030,6 +1184,13 @@ function draw(){
     ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
   });
   ctx.stroke();
+
+  /* 🔧 CHANGE 8B: Red barrier indicator at the end of decoy stubs */
+  state.decoy.forEach((cell, pi)=>{
+    const b = cellCenter(cell);
+    ctx.fillStyle='#e05252';
+    ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill();
+  });
 
   /* main line */
   ctx.strokeStyle='#ffd93d';
@@ -1123,9 +1284,11 @@ function updateHud(){
   sp.textContent = Math.round(state.robot.targetSpeedPct)+' %';
   sp.className = state.robot.targetSpeedPct > state.speedLimit ? 'warn' : 'good';
   document.getElementById('sLimit').textContent = state.speedLimit+' %';
+
+  /* 🔧 CHANGE 8C: Show total accumulated speeding time */
   const v = document.getElementById('sViol');
-  v.textContent = state.overSpeed > 1.0 ? state.overSpeed.toFixed(1)+' s' : '0';
-  v.className = state.overSpeed > 1.0 ? 'bad' : '';
+  v.textContent = state.totalOverSpeed > 0.5 ? state.totalOverSpeed.toFixed(1)+' s' : '0';
+  v.className = state.totalOverSpeed > 0.5 ? 'bad' : '';
 }
 
 function banner(text, cls){
