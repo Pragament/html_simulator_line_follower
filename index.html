@@ -160,6 +160,14 @@
   <div class="ctrl">
     <select id="mazeType"></select>
     <button id="newMaze">🎲 New Maze</button>
+    <select id="exampleScript">
+      <option value="">📋 Load Example Script...</option>
+      <option value="lesson1">Lesson 1: Follow line (until goal)</option>
+      <option value="lesson2">Lesson 2: Waypoint Run (1 CP)</option>
+      <option value="lesson3">Lesson 3: Fractions on road (2 CPs + Speed)</option>
+      <option value="lesson4">Lesson 4: Pattern Trail (3 CPs)</option>
+      <option value="lesson5">Lesson 5: Geometry Grid (4 CPs)</option>
+    </select>
   </div>
   <div class="ctrl" style="margin-left:auto">
     <button id="runBtn" class="primary">▶ Run</button>
@@ -1359,6 +1367,120 @@ function loop(t){
 }
 
 /* ==========================================================================
+   EXAMPLE SCRIPT LOADER (Loads corresponding scripts for Lessons 1 - 5)
+   ========================================================================== */
+function loadExampleScript(key){
+  if(!key) return;
+  const sel = document.getElementById('mazeType');
+  const exSel = document.getElementById('exampleScript');
+  if(exSel) exSel.value = key;
+
+  if(key === 'lesson1'){
+    sel.value = 'waypoint';
+    buildMaze('waypoint');
+    renderMazeInfo();
+    script[0].body = [];
+    const forever = makeBlock('forever');
+    const lf = makeBlock('lineFollow');
+    lf.fields.mode = 'goal';
+    forever.body.push(lf);
+    script[0].body.push(forever);
+    renderScript();
+    banner('📋 Loaded Lesson 1 example. Press ▶ Run to see autopilot follow line to goal without checkpoints.');
+    return;
+  }
+
+  if(key === 'lesson2'){
+    sel.value = 'waypoint';
+    buildMaze('waypoint');
+    renderMazeInfo();
+    script[0].body = [];
+    const forever = makeBlock('forever');
+    forever.body.push(makeBlock('lineFollow'));
+    const if1 = makeBlock('if');
+    if1.fields.cond = 'cp1';
+    const turn1 = makeBlock('turn');
+    turn1.fields.dir = state.checkpoints[0].required;
+    turn1.fields.n = 90;
+    if1.body.push(turn1);
+    forever.body.push(if1);
+    script[0].body.push(forever);
+    renderScript();
+    banner(`📋 Loaded Lesson 2 example (${state.checkpoints[0].required.toUpperCase()} turn at Checkpoint 1). Press ▶ Run.`);
+    return;
+  }
+
+  if(key === 'lesson3'){
+    sel.value = 'relay';
+    buildMaze('relay');
+    renderMazeInfo();
+    script[0].body = [];
+    const spd = makeBlock('setSpeed');
+    spd.fields.n = 65;
+    script[0].body.push(spd);
+    const forever = makeBlock('forever');
+    forever.body.push(makeBlock('lineFollow'));
+    state.checkpoints.forEach((cp, idx) => {
+      const ifBlk = makeBlock('if');
+      ifBlk.fields.cond = 'cp' + (idx + 1);
+      const turn = makeBlock('turn');
+      turn.fields.dir = cp.required;
+      turn.fields.n = 90;
+      ifBlk.body.push(turn);
+      forever.body.push(ifBlk);
+    });
+    script[0].body.push(forever);
+    renderScript();
+    banner('📋 Loaded Lesson 3 example (Speed 65% + 2 Checkpoints). Press ▶ Run.');
+    return;
+  }
+
+  if(key === 'lesson4'){
+    sel.value = 'pattern';
+    buildMaze('pattern');
+    renderMazeInfo();
+    script[0].body = [];
+    const forever = makeBlock('forever');
+    forever.body.push(makeBlock('lineFollow'));
+    state.checkpoints.forEach((cp, idx) => {
+      const ifBlk = makeBlock('if');
+      ifBlk.fields.cond = 'cp' + (idx + 1);
+      const turn = makeBlock('turn');
+      turn.fields.dir = cp.required;
+      turn.fields.n = 90;
+      ifBlk.body.push(turn);
+      forever.body.push(ifBlk);
+    });
+    script[0].body.push(forever);
+    renderScript();
+    banner('📋 Loaded Lesson 4 example (Pattern Trail - 3 Checkpoints). Press ▶ Run.');
+    return;
+  }
+
+  if(key === 'lesson5'){
+    sel.value = 'geometry';
+    buildMaze('geometry');
+    renderMazeInfo();
+    script[0].body = [];
+    const forever = makeBlock('forever');
+    forever.body.push(makeBlock('lineFollow'));
+    state.checkpoints.forEach((cp, idx) => {
+      const ifBlk = makeBlock('if');
+      ifBlk.fields.cond = 'cp' + (idx + 1);
+      const turn = makeBlock('turn');
+      turn.fields.dir = cp.required;
+      turn.fields.n = 90;
+      ifBlk.body.push(turn);
+      forever.body.push(ifBlk);
+    });
+    script[0].body.push(forever);
+    renderScript();
+    banner('📋 Loaded Lesson 5 example (Geometry Grid - 4 Checkpoints). Press ▶ Run.');
+    return;
+  }
+}
+
+/* ==========================================================================
    INIT
    ========================================================================== */
 function init(){
@@ -1369,15 +1491,28 @@ function init(){
     sel.appendChild(o);
   });
   sel.value='waypoint';
+  const exSel = document.getElementById('exampleScript');
   sel.addEventListener('change',()=>{
+    if(exSel) exSel.value = '';
     buildMaze(sel.value);
     renderMazeInfo();
   });
 
   document.getElementById('newMaze').addEventListener('click',()=>{
-    buildMaze(sel.value);
-    renderMazeInfo();
+    if(exSel && exSel.value){
+      loadExampleScript(exSel.value);
+    } else {
+      buildMaze(sel.value);
+      renderMazeInfo();
+    }
   });
+
+  if(exSel){
+    exSel.addEventListener('change', e=>{
+      loadExampleScript(e.target.value);
+    });
+  }
+
   document.getElementById('runBtn').addEventListener('click', startRun);
   document.getElementById('stopBtn').addEventListener('click', ()=>{
     if(program.running) endProgram('stopped');
