@@ -106,8 +106,8 @@
     border-left:none;background:rgba(0,0,0,.12);
     border-radius:6px;min-height:36px;
   }
-  .body.over{background:rgba(255,255,255,.2);outline:1.5px dashed #ffd93d}
-  .body .hint{font-size:11px;color:rgba(255,255,255,.55);font-weight:500;font-style:italic;padding:4px 2px}
+  .body .hint{font-size:11px;color:rgba(255,255,255,.55);font-weight:500;font-style:italic;padding:4px 2px;pointer-events:none}
+  .block.control > .body{min-height:34px}
 
   /* ---------- MAIN ---------- */
   main{flex:1;display:flex;flex-direction:column;overflow-y:auto;padding:12px;gap:10px;align-items:center}
@@ -579,11 +579,19 @@ function buildPalette(){
         e.dataTransfer.effectAllowed='copy';
       });
 
-      /* 🔧 CHANGE 5: Intelligently append clicked blocks inside forever loop instead of after it */
+      /* 🔧 CHANGE 5: Intelligently append clicked blocks inside forever / if loop instead of after it */
       el.addEventListener('click',()=>{
         let targetArr = script[0].body;
         if(t !== 'forever' && targetArr.length > 0 && targetArr[targetArr.length-1].type === 'forever'){
           targetArr = targetArr[targetArr.length-1].body;
+        }
+        if(t !== 'if' && t !== 'forever'){
+          const emptyIf = targetArr.slice().reverse().find(b => b.type === 'if' && b.body.length === 0);
+          if(emptyIf){
+            targetArr = emptyIf.body;
+          } else if(targetArr.length > 0 && targetArr[targetArr.length-1].type === 'if'){
+            targetArr = targetArr[targetArr.length-1].body;
+          }
         }
         targetArr.push(makeBlock(t));
         renderScript();
@@ -784,7 +792,7 @@ function runBlock(blk){
       program.stack.push({body:blk.body,index:0,repeat:Math.max(1,blk.fields.n|0),count:0});
       return 'ok';
     case 'if':
-      if(evalCond(blk.fields.cond)) program.stack.push({body:blk.body,index:0});
+      if(evalCond(blk.fields.cond)) program.stack.push({body:blk.body,index:0,isIf:true,cond:blk.fields.cond});
       return 'ok';
     case 'wait':
       program.waitTimer = Math.max(0.05, +blk.fields.n || 1);
@@ -794,6 +802,12 @@ function runBlock(blk){
       r.targetSpeed = r.targetSpeedPct * PX_PER_PCT;
       return 'ok';
     case 'turn': {
+      /* 🔧 CHANGE 9: Turn blocks can ONLY work inside an 'if' condition block */
+      const currentFrame = program.stack[program.stack.length-1];
+      if (!currentFrame || !currentFrame.isIf) {
+        fail('⚠ Turn blocks can only work inside an "if" condition block (e.g. "if at checkpoint 1 then")!');
+        return 'pause';
+      }
       const dir = blk.fields.dir==='left' ? -1 : 1;
       const deg = Math.abs(+blk.fields.n || 90);
       const ang = deg * Math.PI/180;
